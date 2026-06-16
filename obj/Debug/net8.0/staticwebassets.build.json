@@ -1,0 +1,39 @@
+{
+  "Version": 1,
+  "Hash": "zC5Yn1+eY5P0WdaQyBgL9aEjmE2q+CLxJBK0ZGZViNQ=",
+  "Source": "UserManagementApp",
+  "BasePath": "_content/UserManagementApp",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [
+    {
+      "Name": "UserManagementApp\\wwwroot",
+      "Source": "UserManagementApp",
+      "ContentRoot": "C:\\Users\\User\\Downloads\\UserManagementApp\\wwwroot\\",
+      "BasePath": "_content/UserManagementApp",
+      "Pattern": "**"
+    }
+  ],
+  "Assets": [
+    {
+      "Identity": "C:\\Users\\User\\Downloads\\UserManagementApp\\wwwroot\\js\\site.js",
+      "SourceId": "UserManagementApp",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\User\\Downloads\\UserManagementApp\\wwwroot\\",
+      "BasePath": "_content/UserManagementApp",
+      "RelativePath": "js/site.js",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\js\\site.js"
+    }
+  ]
+}

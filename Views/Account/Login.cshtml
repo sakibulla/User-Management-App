@@ -1,0 +1,70 @@
+@model UserManagementApp.Models.LoginViewModel
+@{
+    ViewData["Title"] = "Sign In";
+    Layout = "_Layout";
+}
+
+<!-- NOTE: Login page uses a centered card layout — clean, professional, no wallpaper -->
+<div class="row justify-content-center mt-5">
+    <div class="col-sm-10 col-md-6 col-lg-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <div class="text-center mb-4">
+                    <i class="bi bi-people-fill text-primary" style="font-size:2rem;"></i>
+                    <h5 class="mt-2 fw-semibold">Sign in to UserAdmin</h5>
+                    <p class="text-muted small">User management panel</p>
+                </div>
+
+                <!-- NOTE: Validation summary shows server-side errors (e.g. bad credentials) -->
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div class="alert alert-danger py-2" role="alert">
+                        <i class="bi bi-exclamation-circle me-1"></i>
+                        <asp-validation-summary asp-validation-summary="All" class="d-inline mb-0" />
+                    </div>
+                }
+
+                <form asp-action="Login" method="post">
+                    @Html.AntiForgeryToken()
+
+                    <div class="mb-3">
+                        <label asp-for="Email" class="form-label small fw-medium">Email address</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-envelope"></i>
+                            </span>
+                            <input asp-for="Email" class="form-control" type="email"
+                                   placeholder="you@example.com" autocomplete="email" autofocus
+                                   title="Enter your registered email address" />
+                        </div>
+                        <span asp-validation-for="Email" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-4">
+                        <label asp-for="Password" class="form-label small fw-medium">Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-lock"></i>
+                            </span>
+                            <input asp-for="Password" class="form-control" type="password"
+                                   placeholder="Your password" autocomplete="current-password"
+                                   title="Enter your password" />
+                        </div>
+                        <span asp-validation-for="Password" class="text-danger small"></span>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100"
+                            title="Sign in to access the user management panel">
+                        <i class="bi bi-box-arrow-in-right me-1"></i>Sign in
+                    </button>
+                </form>
+
+                <hr class="my-3">
+                <p class="text-center text-muted small mb-0">
+                    Don't have an account?
+                    <a asp-controller="Account" asp-action="Register">Register here</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>

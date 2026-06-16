@@ -1,0 +1,320 @@
+@model IEnumerable<UserManagementApp.Models.UserTableRow>
+@{
+    ViewData["Title"] = "Users";
+}
+@* NOTE: Antiforgery token for AJAX requests from the toolbar *@
+@Html.AntiForgeryToken()
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h6 class="mb-0 fw-semibold text-secondary text-uppercase tracking-wide" style="letter-spacing:.05em">
+        User Management
+    </h6>
+    <span class="text-muted small">@Model.Count() user(s) total</span>
+</div>
+
+<!-- IMPORTANT: Toolbar must always be visible (not appear/disappear) per requirement #2.
+     Buttons may be enabled/disabled based on selection state. -->
+<div class="toolbar-area d-flex align-items-center gap-2 flex-wrap">
+    <!-- Block: text button per assignment ("Block (button with text)") -->
+    <button id="btn-block" class="btn btn-sm btn-outline-danger" disabled
+            title="Block selected users — they will not be able to log in"
+            data-action="block">
+        <i class="bi bi-lock-fill me-1"></i>Block
+    </button>
+
+    <!-- Unblock: icon only per assignment ("Unblock (icon)") -->
+    <button id="btn-unblock" class="btn btn-sm btn-outline-success" disabled
+            title="Unblock selected users — restores login access"
+            data-action="unblock">
+        <i class="bi bi-unlock-fill"></i>
+    </button>
+
+    <!-- Delete: icon only -->
+    <button id="btn-delete" class="btn btn-sm btn-outline-secondary" disabled
+            title="Permanently delete selected users — this cannot be undone"
+            data-action="delete">
+        <i class="bi bi-trash3-fill"></i>
+    </button>
+
+    <!-- Delete unverified: icon only, no selection needed -->
+    <button id="btn-delete-unverified" class="btn btn-sm btn-outline-warning"
+            title="Delete all users whose email has not been verified"
+            data-action="delete-unverified">
+        <i class="bi bi-person-x-fill"></i>
+    </button>
+
+    <!-- Selection count indicator -->
+    <span id="selection-info" class="text-muted small ms-2" style="display:none;">
+        <span id="selection-count">0</span> selected
+    </span>
+</div>
+
+<!-- NOTA BENE: Table is rendered immediately after toolbar with no gap/separator
+     so they look like one connected component (toolbar + table) -->
+<div class="table-wrapper">
+    <table class="table table-hover table-bordered" id="users-table">
+        <thead>
+            <tr>
+                <!-- IMPORTANT: Header checkbox = select all / deselect all (no label) -->
+                <th class="col-check">
+                    <input type="checkbox" id="select-all" class="form-check-input"
+                           title="Select or deselect all users" />
+                </th>
+                <th class="col-name">Name</th>
+                <th class="col-email">Email</th>
+                <th class="col-status text-center">Status</th>
+                <th class="col-login text-end">Last login</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in Model)
+            {
+                <tr class="user-row @(user.Status == "blocked" ? "user-blocked" : "")"
+                    data-id="@user.Id" data-status="@user.Status">
+                    <!-- Leftmost column: checkbox, no label -->
+                    <td class="col-check">
+                        <input type="checkbox" class="form-check-input row-check"
+                               value="@user.Id"
+                               title="Select @user.Name" />
+                    </td>
+                    <td class="col-name">
+                        <div class="fw-medium">@user.Name</div>
+                        <div class="text-muted-small">
+                            Registered @user.RegisteredAt.ToString("MMM d, yyyy")
+                        </div>
+                    </td>
+                    <td class="col-email">@user.Email</td>
+                    <td class="col-status text-center">
+                        @{
+                            var badgeClass = user.Status switch
+                            {
+                                "active"     => "badge-active",
+                                "blocked"    => "badge-blocked",
+                                _            => "badge-unverified"
+                            };
+                            var statusLabel = user.Status switch
+                            {
+                                "active"     => "Active",
+                                "blocked"    => "Blocked",
+                                _            => "Unverified"
+                            };
+                        }
+                        <span class="badge @badgeClass text-capitalize">@statusLabel</span>
+                    </td>
+                    <td class="col-login text-end">
+                        @if (user.LastLoginAt.HasValue)
+                        {
+                            <span title="@user.LastLoginAt.Value.ToString("yyyy-MM-dd HH:mm:ss") UTC">
+                                @GetRelativeTime(user.LastLoginAt.Value)
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">Never</span>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (!Model.Any())
+            {
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox me-2"></i>No users found.
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@functions {
+    // NOTE: getUniqIdValue equivalent in Razor — computes human-readable relative time
+    // for the "last login" column display
+    string GetRelativeTime(DateTime utcTime)
+    {
+        var diff = DateTime.UtcNow - utcTime;
+        if (diff.TotalSeconds < 60)   return "less than a minute ago";
+        if (diff.TotalMinutes < 60)   return $"{(int)diff.TotalMinutes} min ago";
+        if (diff.TotalHours < 24)     return $"{(int)diff.TotalHours} hr ago";
+        if (diff.TotalDays < 7)       return $"{(int)diff.TotalDays} day(s) ago";
+        if (diff.TotalDays < 30)      return $"{(int)(diff.TotalDays / 7)} week(s) ago";
+        return utcTime.ToString("MMM d, yyyy");
+    }
+}
+
+@section Scripts {
+<script>
+// NOTE: All toolbar interactions use fetch() to POST JSON to /users/bulk-action.
+// The page reloads after each successful action to reflect updated state.
+
+// IMPORTANT: getUniqIdValue — returns the CSRF antiforgery token from the hidden input.
+// Required by ASP.NET Core for all state-changing requests.
+function getUniqIdValue() {
+    return document.querySelector('input[name="__RequestVerificationToken"]').value;
+}
+
+// --- Checkbox selection logic ---
+
+const selectAll = document.getElementById('select-all');
+const rowChecks = document.querySelectorAll('.row-check');
+const selectionInfo = document.getElementById('selection-info');
+const selectionCount = document.getElementById('selection-count');
+
+// Toolbar action buttons (by data-action attribute for DRY handling)
+const btnBlock            = document.getElementById('btn-block');
+const btnUnblock          = document.getElementById('btn-unblock');
+const btnDelete           = document.getElementById('btn-delete');
+const btnDeleteUnverified = document.getElementById('btn-delete-unverified');
+
+// NOTE: updateToolbar enables/disables toolbar buttons based on current selection
+function updateToolbar() {
+    const checked = document.querySelectorAll('.row-check:checked');
+    const count = checked.length;
+
+    // IMPORTANT: Toolbar never disappears — only enabled/disabled per requirement #2
+    btnBlock.disabled   = count === 0;
+    btnUnblock.disabled = count === 0;
+    btnDelete.disabled  = count === 0;
+    // Delete-unverified never needs selection — always enabled
+
+    if (count > 0) {
+        selectionInfo.style.display = '';
+        selectionCount.textContent = count;
+    } else {
+        selectionInfo.style.display = 'none';
+    }
+}
+
+// Select-all checkbox handler
+selectAll.addEventListener('change', () => {
+    rowChecks.forEach(cb => cb.checked = selectAll.checked);
+    // Visually update indeterminate state
+    selectAll.indeterminate = false;
+    updateToolbar();
+});
+
+// Individual row checkbox handler
+rowChecks.forEach(cb => {
+    cb.addEventListener('change', () => {
+        const total   = rowChecks.length;
+        const checked = document.querySelectorAll('.row-check:checked').length;
+        selectAll.checked       = checked === total;
+        selectAll.indeterminate = checked > 0 && checked < total;
+        updateToolbar();
+    });
+});
+
+// --- Toolbar action handler ---
+
+// NOTE: getSelectedIds — collects values from all checked row checkboxes
+function getSelectedIds() {
+    return Array.from(document.querySelectorAll('.row-check:checked'))
+                .map(cb => parseInt(cb.value, 10));
+}
+
+// IMPORTANT: showToast — displays a non-blocking Bootstrap toast notification
+// with either success or error styling. Used for all action feedback.
+// NO browser alerts per assignment requirement.
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    const id = 'toast-' + Date.now();
+    const icon = type === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill';
+    const bgClass = type === 'success' ? 'bg-success' : 'bg-danger';
+
+    const html = `
+        <div id="${id}" class="toast align-items-center text-white ${bgClass} border-0"
+             role="alert" aria-live="assertive" aria-atomic="true">
+          <div class="d-flex">
+            <div class="toast-body">
+              <i class="bi ${icon} me-2"></i>${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                    data-bs-dismiss="toast"></button>
+          </div>
+        </div>`;
+
+    container.insertAdjacentHTML('beforeend', html);
+    const toastEl = document.getElementById(id);
+    const toast = new bootstrap.Toast(toastEl, { delay: 3500 });
+    toast.show();
+    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+}
+
+// NOTA BENE: performAction — sends the bulk action request to the server.
+// On success, reloads the page so the table reflects updated user states.
+// On error, shows a toast without reloading (state might be partially changed).
+async function performAction(action, ids) {
+    try {
+        // IMPORTANT: Send the antiforgery token in the X-CSRF-TOKEN header.
+        // This is the standard way ASP.NET Core's ValidateAntiForgeryToken attribute
+        // expects it for JSON POST requests.
+        const response = await fetch('/users/bulk-action', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': getUniqIdValue()
+            },
+            body: JSON.stringify({ 
+                action, 
+                userIds: ids
+            })
+        });
+
+        // IMPORTANT: Check response status BEFORE parsing JSON
+        // If the server returns an error (e.g., antiforgery validation failed),
+        // the response may not be valid JSON
+        if (!response.ok) {
+            let errorMessage = 'Action failed.';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.message || errorMessage;
+            } catch {
+                // Response is not JSON (e.g., HTML error page) — use HTTP status text
+                errorMessage = `Error: ${response.status} ${response.statusText}`;
+            }
+            console.error(`[${action}] Request failed:`, { status: response.status, message: errorMessage });
+            showToast(errorMessage, 'error');
+            return;
+        }
+
+        const data = await response.json();
+        showToast(data.message || 'Done.');
+
+        // NOTE: If the current user was affected (blocked/deleted themselves),
+        // redirect to login. Otherwise refresh the table.
+        if (data.selfAffected) {
+            setTimeout(() => { window.location.href = '/account/login'; }, 1200);
+        } else {
+            setTimeout(() => { window.location.reload(); }, 800);
+        }
+    } catch (err) {
+        console.error(`[${action}] Network error:`, err);
+        showToast('Network error — please try again.', 'error');
+    }
+}
+
+// Wire up toolbar buttons
+btnBlock.addEventListener('click', () => {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    performAction('block', ids);
+});
+
+btnUnblock.addEventListener('click', () => {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    performAction('unblock', ids);
+});
+
+btnDelete.addEventListener('click', () => {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    performAction('delete', ids);
+});
+
+// NOTE: Delete-unverified needs no selection — acts on all unverified users
+btnDeleteUnverified.addEventListener('click', () => {
+    performAction('delete-unverified', []);
+});
+</script>
+}
