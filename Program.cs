@@ -47,23 +47,22 @@ builder.Services.AddScoped<EmailService>();
 
 var app = builder.Build();
 
-// IMPORTANT: Only auto-create database in development.
-// In production, configure DATABASE_URL environment variable to your remote PostgreSQL instance.
-// The connection string is read from appsettings.json or the DATABASE_URL env var.
-if (app.Environment.IsDevelopment())
+// IMPORTANT: Create/migrate the database tables
+// This runs in both Development AND Production on Railway
+// Railway's PostgreSQL is ready to accept connections
+try
 {
-    try
+    using (var scope = app.Services.CreateScope())
     {
-        using (var scope = app.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Database.EnsureCreated();
-        }
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Database.EnsureCreated();
+        app.Logger.LogInformation("✓ Database tables created/verified successfully");
     }
-    catch (Exception ex)
-    {
-        app.Logger.LogError(ex, "Failed to create/migrate database on startup. Manual migration may be needed.");
-    }
+}
+catch (Exception ex)
+{
+    app.Logger.LogError(ex, "⚠ Failed to initialize database. Continuing anyway.");
+    // Don't crash - the database might initialize on first request
 }
 
 if (!app.Environment.IsDevelopment())
