@@ -18,9 +18,14 @@ builder.Services.AddAntiforgery(options =>
 });
 
 // IMPORTANT: Register PostgreSQL database context
-// Connection string should be in appsettings.json or environment variable
+// Connection string priority:
+// 1. DATABASE_URL environment variable (set by Railway, Heroku, etc.)
+// 2. DefaultConnection from appsettings.json (local dev)
+var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
+    ?? builder.Configuration.GetConnectionString("DefaultConnection");
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(connectionString));
 
 // NOTE: Cookie-based authentication — simple, stateless, no token library needed
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -42,12 +47,23 @@ builder.Services.AddScoped<EmailService>();
 
 var app = builder.Build();
 
-// Auto-create/migrate the database on startup (dev convenience)
-// IMPORTANT: In production, use proper migrations instead
-using (var scope = app.Services.CreateScope())
+// IMPORTANT: Only auto-create database in development.
+// In production, configure DATABASE_URL environment variable to your remote PostgreSQL instance.
+// The connection string is read from appsettings.json or the DATABASE_URL env var.
+if (app.Environment.IsDevelopment())
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
+    try
+    {
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Database.EnsureCreated();
+        }
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Failed to create/migrate database on startup. Manual migration may be needed.");
+    }
 }
 
 if (!app.Environment.IsDevelopment())

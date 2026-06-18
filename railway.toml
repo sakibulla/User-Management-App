@@ -3,3 +3,5 @@ builder = "dockerfile"
 
 [deploy]
 startCommand = "dotnet UserManagementApp.dll"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5

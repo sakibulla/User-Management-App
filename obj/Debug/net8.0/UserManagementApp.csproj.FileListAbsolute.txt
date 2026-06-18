@@ -38,3 +38,4 @@ C:\Users\User\Downloads\UserManagementApp\obj\Debug\net8.0\refint\UserManagement
 C:\Users\User\Downloads\UserManagementApp\obj\Debug\net8.0\UserManagementApp.pdb
 C:\Users\User\Downloads\UserManagementApp\obj\Debug\net8.0\UserManagementApp.genruntimeconfig.cache
 C:\Users\User\Downloads\UserManagementApp\obj\Debug\net8.0\ref\UserManagementApp.dll
+C:\Users\User\Downloads\UserManagementApp\obj\Debug\net8.0\UserManagementApp.sourcelink.json

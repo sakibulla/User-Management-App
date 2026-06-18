@@ -4,7 +4,7 @@ using MimeKit;
 namespace UserManagementApp.Services;
 
 // NOTE: Sends verification emails asynchronously (fire-and-forget from controller).
-// Uses MailKit which wraps SMTP — configure via appsettings.json
+// Uses MailKit which wraps SMTP — configure via appsettings.json or environment variables
 public class EmailService
 {
     private readonly IConfiguration _config;
@@ -22,11 +22,18 @@ public class EmailService
     {
         try
         {
-            var smtpHost = _config["Email:SmtpHost"] ?? "smtp.gmail.com";
-            var smtpPort = int.Parse(_config["Email:SmtpPort"] ?? "587");
-            var smtpUser = _config["Email:SmtpUser"] ?? "";
-            var smtpPass = _config["Email:SmtpPass"] ?? "";
-            var fromName = _config["Email:FromName"] ?? "User Management App";
+            // NOTA BENE: Read credentials from environment variables first (production),
+            // fall back to appsettings.json (development)
+            var smtpHost = Environment.GetEnvironmentVariable("EMAIL_SMTPHOST") 
+                ?? _config["Email:SmtpHost"] ?? "smtp.gmail.com";
+            var smtpPort = int.Parse(Environment.GetEnvironmentVariable("EMAIL_SMTPPORT") 
+                ?? _config["Email:SmtpPort"] ?? "587");
+            var smtpUser = Environment.GetEnvironmentVariable("EMAIL_SMTPUSER") 
+                ?? _config["Email:SmtpUser"] ?? "";
+            var smtpPass = Environment.GetEnvironmentVariable("EMAIL_SMTPPASS") 
+                ?? _config["Email:SmtpPass"] ?? "";
+            var fromName = Environment.GetEnvironmentVariable("EMAIL_FROMNAME")
+                ?? _config["Email:FromName"] ?? "User Management App";
 
             // NOTE: Skip sending if SMTP credentials not configured (dev mode)
             if (string.IsNullOrEmpty(smtpUser) || string.IsNullOrEmpty(smtpPass))
