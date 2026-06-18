@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using UserManagementApp.Data;
 using UserManagementApp.Middleware;
 using UserManagementApp.Services;
@@ -19,11 +20,31 @@ builder.Services.AddAntiforgery(options =>
 
 // IMPORTANT: Register PostgreSQL database context
 // Connection string priority:
-// 1. DATABASE_URL environment variable (set by Railway)
+// 1. DATABASE_URL environment variable (set by Railway) — needs SSL mode conversion
 // 2. DefaultConnection from appsettings.json (local dev)
 
-var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
-    ?? builder.Configuration.GetConnectionString("DefaultConnection");
+var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+var connectionString = databaseUrl ?? builder.Configuration.GetConnectionString("DefaultConnection");
+
+// NOTA BENE: Railway provides DATABASE_URL in postgresql:// format
+// We must convert it to NpgsqlConnectionStringBuilder format with SSL mode
+if (!string.IsNullOrEmpty(databaseUrl))
+{
+    // Parse railway's postgresql:// URL and convert to Npgsql format
+    var uri = new Uri(databaseUrl);
+    var builder_cs = new Npgsql.NpgsqlConnectionStringBuilder
+    {
+        Host = uri.Host,
+        Port = uri.Port > 0 ? uri.Port : 5432,
+        Database = uri.AbsolutePath.TrimStart('/'),
+        Username = uri.UserInfo.Split(':')[0],
+        Password = uri.UserInfo.Split(':')[1],
+        SslMode = Npgsql.SslMode.Require,
+        TrustServerCertificate = true,
+        CommandTimeout = 30,
+    };
+    connectionString = builder_cs.ConnectionString;
+}
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
