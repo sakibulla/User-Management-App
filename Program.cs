@@ -19,8 +19,9 @@ builder.Services.AddAntiforgery(options =>
 
 // IMPORTANT: Register PostgreSQL database context
 // Connection string priority:
-// 1. DATABASE_URL environment variable (set by Railway, Heroku, etc.)
+// 1. DATABASE_URL environment variable (set by Railway)
 // 2. DefaultConnection from appsettings.json (local dev)
+
 var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
     ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
