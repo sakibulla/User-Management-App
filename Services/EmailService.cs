@@ -42,6 +42,8 @@ public class EmailService
                 return;
             }
 
+            _logger.LogInformation("Attempting to send email to {Email} via {SmtpHost}:{SmtpPort}", toEmail, smtpHost, smtpPort);
+
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress(fromName, smtpUser));
             message.To.Add(new MailboxAddress(toName, toEmail));
@@ -58,18 +60,22 @@ public class EmailService
             };
 
             using var client = new SmtpClient();
+            _logger.LogInformation("Connecting to SMTP server...");
             await client.ConnectAsync(smtpHost, smtpPort, MailKit.Security.SecureSocketOptions.StartTls);
+            _logger.LogInformation("Authenticating with SMTP server...");
             await client.AuthenticateAsync(smtpUser, smtpPass);
+            _logger.LogInformation("Sending email...");
             await client.SendAsync(message);
+            _logger.LogInformation("Disconnecting from SMTP server...");
             await client.DisconnectAsync(true);
 
-            _logger.LogInformation("Verification email sent to {Email}", toEmail);
+            _logger.LogInformation("✓ Verification email successfully sent to {Email}", toEmail);
         }
         catch (Exception ex)
         {
             // NOTA BENE: Email failures are logged but do NOT fail the registration —
             // user is already registered and can still log in; email is best-effort
-            _logger.LogError(ex, "Failed to send verification email to {Email}", toEmail);
+            _logger.LogError(ex, "✗ Failed to send verification email to {Email}. Exception: {Message}", toEmail, ex.Message);
         }
     }
 }
